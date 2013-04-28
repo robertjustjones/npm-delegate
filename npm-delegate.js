@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-var optimist = require('optimist')
-var fallback = require('fallback')
-var http = require('http')
-var https = require('https')
-var url = require('url2')
+var optimist = require('optimist');
+var fallback = require('fallback');
+var http = require('http');
+var https = require('https');
+var url = require('url2');
 
 var argv = optimist
   .usage('Compose multiple npm registries in fallback order.\nUsage: $0 [opts] host1/registry host2/registry ... hostN/registry')
@@ -16,61 +16,61 @@ var argv = optimist
     .describe('s', 'run the proxy using https?')
   .check(function (argv) {
     if (!argv._.length)
-      throw new Error('you must specify at least one registry (two to be useful)')
+      throw new Error('you must specify at least one registry (two to be useful)');
   })
   .argv;
 
-var registries = argv._.map(parseRegistry)
+var registries = argv._.map(parseRegistry);
 
 function parseRegistry(string) {
-  var parsed = url.parse(string)
+  var parsed = url.parse(string);
   if (!/http(s?):/.test(parsed.protocol))
-    die('invalid registry address: specify a protocol (eg https://): ' + string)
+    die('invalid registry address: specify a protocol (eg https://): ' + string);
 
-  parsed.port || (parsed.port = 80)
+  parsed.port || (parsed.port = 80);
 
-  return parsed
+  return parsed;
 }
 
-(argv.secure ? https : http).createServer(delegate).listen(argv.port)
-console.log('proxy started')
-console.dir(registries.map(url.format))
+(argv.secure ? https : http).createServer(delegate).listen(argv.port);
+console.log('proxy started');
+console.dir(registries.map(url.format));
 
 
 function delegate(req, resOut) {
 
   if (req.method !== 'GET') {
-    console.log('invalid method')
-    resOut.statusCode = 405
-    resOut.write(JSON.stringify({error: 'invalid method'}))
-    resOut.end()
-    return
+    console.log('invalid method');
+    resOut.statusCode = 405;
+    resOut.write(JSON.stringify({error: 'invalid method'}));
+    resOut.end();
+    return;
   }
 
   fallback(registries, function (registry, cb) {
-    console.log('forwarding to ' + registry.hostname)
+    console.log('forwarding to ' + registry.hostname);
     forward(req, registry, function (err, res) {
       if (!err) {
-        return cb(null, res)
+        return cb(null, res);
       }
-      console.log('err calling ' + registry.hostname + '. ' + err)
-      return cb()
-    })
+      console.log('err calling ' + registry.hostname + '. ' + err);
+      return cb();
+    });
 
   }, function (err, resIn, registry) {
     if (err) {
-      resOut.write(JSON.stringify({error: 'There was an error resolving your request:\n' + JSON.stringify(err, null, 2)}))
-      return resOut.end()
+      resOut.write(JSON.stringify({error: 'There was an error resolving your request:\n' + JSON.stringify(err, null, 2)}));
+      return resOut.end();
     }
     else if (!resIn) {
-      resOut.statusCode = 400
+      resOut.statusCode = 400;
       resOut.write(JSON.stringify({error: 'request could not be fulfilled by any of the registries on this proxy.'
-        + 'perhaps the module you\'re looking for does not exist'}))
-      resOut.end()
+        + 'perhaps the module you\'re looking for does not exist'}));
+      resOut.end();
     } else {
-      console.log('proxying response from registry' + url.format(registry))
-      resOut.setHeader('x-registry', url.format(registry))
-      pipeRes(resIn, resOut)
+      console.log('proxying response from registry' + url.format(registry));
+      resOut.setHeader('x-registry', url.format(registry));
+      pipeRes(resIn, resOut);
     }
   });
 
@@ -78,25 +78,26 @@ function delegate(req, resOut) {
 }
 
 function forward(reqIn, registry, cb) {
+ var pathIn = url.parse( reqIn.url ).path;
   var reqOut = {
     hostname: registry.hostname
   , port: registry.port
-  , path: rebase(registry.path, reqIn.url)
+  , path: rebase(registry.path, pathIn)
   , headers: reqIn.headers
   , method: reqIn.method
   , auth: registry.auth
-  }
-  delete reqOut.headers.host
-  delete reqOut.headers.authorization
+  };
+  delete reqOut.headers.host;
+  delete reqOut.headers.authorization;
 
 
-  console.log('fwd req', reqOut)
+  console.log('fwd req', reqOut);
   reqOut = (/https/.test(reqOut.protocol) ? https : http).request(reqOut, function (res) {
-    console.log('res received')
+    console.log('res received');
     if (res.statusCode >= 400) {
-      console.log('bad response from ' + registry.hostname + ' ' + res.statusCode)
-      res.pipe(process.stdout)
-      return cb(new Error('Response from ' + registry.hostname + ': ' + res.statusCode))
+      console.log('bad response from ' + registry.hostname + ' ' + res.statusCode);
+      res.pipe(process.stdout);
+      return cb(new Error('Response from ' + registry.hostname + ': ' + res.statusCode));
     }
     return cb(null, res);
   }).on('error', cb);
@@ -104,32 +105,34 @@ function forward(reqIn, registry, cb) {
 }
 
 function pipeRes(resFrom, resTo) {
-  copyHeaders(resFrom, resTo)
-  resFrom.pipe(resTo)
+  copyHeaders(resFrom, resTo);
+  resFrom.pipe(resTo);
 }
 
 function copyHeaders(resFrom, resTo) {
   resTo.statusCode = resFrom.statusCode;
   for (var header in resFrom.headers) {
-    resTo.setHeader(header, resFrom.headers[header])
+    resTo.setHeader(header, resFrom.headers[header]);
   }
 }
 
 
 function rebase(pathBase, path) {
-    console.log(pathBase, path)
+    console.log('rebase', pathBase, path);
 
     if (pathBase != '/registry') {
-      return path.replace('/registry','')
+      return path.replace('/registry','');
     }
 
     if (path.indexOf('/registry') != 0) {
       return '/registry' + path;
     }
+
+  return path;
 }
 
 
 function die(msg) {
-  console.error(msg)
-  process.exit(1)
+  console.error(msg);
+  process.exit(1);
 }
