@@ -1,0 +1,17 @@
+#! /bin/bash
+set -e
+PATH=/path/node/bin:/bin:/usr/bin:/sbin:/usr/sbin
+DAEMON=/full/path/npm-delegate/npm-delegate.js
+DAEMON_ARGS="-p 6984 http://127.0.0.1:5984/registry https://registry.npmjs.org http://isaacs.iriscouch.com/registry"
+case "$1" in
+status) forever list  2>/dev/null | grep $DAEMON
+    RETVAL=$? ;;
+start) forever start $DAEMON $DAEMON_ARGS ;;
+stop) forever stop $DAEMON ;;
+force-reload|restart)
+forever restart $DAEMON ;;
+*) echo "Usage: $0 {status|start|stop|restart|force-reload}"
+exit 1 ;;
+esac
+exit 0
+
